@@ -83,5 +83,12 @@ class Cache implements Cache\CacheInterface
      */
 	public function getClass() {
 		return $this->class;
-	}
+    }
+    
+    /**
+     * explicit memory clearing 
+     */
+    public function __destruct() {
+        unset($this->type, $this->class); 
+    }
 }
