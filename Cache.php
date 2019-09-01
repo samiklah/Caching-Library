@@ -2,129 +2,86 @@
 
 namespace Cache;
 
-use Cache\CacheInterface;
-
-class Cache
+class Cache implements Cache\CacheInterface
 {
 
-    private $backend; // Current Cache backend
-    private $namespace = ''; // Current namespace
-    private $dTTL = self::TTL; // Default TTL of Cache instance
-    private $separator = ':'; // Separator between parts of namespace and keys
+    protected static $Cache;
+    
+    protected $type;
+    protected $class;
 
-    private static $instances = array();
+    const FILE = 'file';
+	const MEMCACHE = 'memcache';
+	const APC = 'apc';
 
-    const INSTANCE = 'default'; // Default instance name
-    const TTL = 0; // Infinite time-to-live
+	public static $Drivers = array(self::FILE, self::MEMCACHE, self::APC);
 
-    /**
-     * @param optional CacheInterface $backend Instance of cache backend
-     */
-    public function __construct(CacheInterface $backend = null)
-    {
-        if ($backend)
-        {
-            $this->setBackend($backend);
-        }
-    }
 
-    /**
-     * Returns a Cache instance
-     * @param String String $name Name of instance, default INSTANCE
-     * @param optional CacheInterface $backend Instance of cache backend
-     * @return CacheInterface
-     */
-    public static function instance(string $name = null, CacheInterface $backend = null)
-    {
-        if ($name === null)
-        {
-            $name = self::INSTANCE;
-        }
-        if (isset(self::$instances[$name]) === false)
-        {
-            self::$instances[$name] = new Cache($backend);
-        }
-        return self::$instances[$name];
-    }
+	public static function Instance() {
+		if(is_null(self::$Cache)) {
+			self::$Cache = new self();
+		}
+		return self::$Cache;
+	}
 
 
     /**
-     * Set cache backend
-     * @param CacheInterface $backend
-     * @return self
-     */
-    public function setBackend(CacheInterface $backend)
-    {
-        $this->backend = $backend;
-        return $this;
-    }
-
-    public function setNamespace($ns)
-    {
-        $this->backend = $backend;
-        return $this;
-    }
-
-    public function setKeySeparator($separator)
-    {
-        $this->separator = $separator;
-        return $this;
-    }
-
-    private function setKey($key)
-    {
-        if ($this->namespace)
-        {
-            $key = $this->namespace . $this->separator . $key;
-        }
-        return $key;
-    }
-
-
-    public function get($key)
-    {
-        return $this->backend->get($this->setKey($key));
-    }
-
-    public function set($key, $value, $ttl = null)
-    {
-        $this->backend->set($this->setKey($key), $value, $ttl ?: $this->dTTL);
-        return $this;
-    }
-
-    /**
-     * Get value from $clo result if cache ID is not set, then returns value
-     * of cache entry
+     * Set value Of cache
      * @param String $key Cache ID
-     * @param Closure $clo Closure executed if cache entry is not set
-     * @param optional Integer $ttl Time-to-live of cache entry
+     * @param mixed $value this is actually what is returned
+     * @param optional $expire
      * @return mixed
      */
-    public function getset($key, \Closure $clo, $ttl = null)
-    {
-        $key = $this->setKey($key);
-        if (($value = $this->get($key)) === null)
-        {
-            $value = $clo();
-            $this->set($key, $value, $ttl ?: $this->dTTL);
-        }
-        return $value;
-    }
+	public function set($key, $value, $expire = NULL) {
+		if($this->class) {
+			return $this->class->set($key, $value, $expire);
+		}
+		return $value;
+	}
 
     /**
-     * Get namespace from this cache instance
-     * @param String $key Name of namespace (prefix of cache ID)
-     * @return Cache
+     * Get value Of cache
+     * @param String $key Cache ID
+     * @return mixed
      */
-    public function ns($key)
-    {
-        $cache = new Cache();
-        return $cache
-            ->setBackend($this->backend)
-            ->setKeySeparator($this->separator)
-            ->setNamespace($this->setKey($key));
-    }
+	public function get($key) {
+		if($this->class) {
+			return $this->class->get($key);
+		}
+		return NULL;
+	}
 
-    
+    /**
+     * Seting a cache type
+     * @param String $type 
+     */
+	public function setType($type) {
+		if($type && !in_array($type, self::$Drivers)) {
+			throw new \InvalidArgumentException('Unknown type');
+		}
+		$this->type = $type;
+		switch($type) {
+			case self::MEMCACHE:
+				$this->class = new \Cache\Drivers\CacheMemcache();
+			case self::APC:
+				$this->class = new \Cache\Drivers\CacheApc();
+		}
+		$this->class = new \Cache\Drivers\CacheFile();
+	}
 
+    /**
+     * Get cache type
+     * @return String
+     */
+	public function getType() {
+		return $this->type;
+	}
+
+    /**
+     * Get cache driver
+     * @return String
+     */
+	public function getClass() {
+		return $this->class;
+	}
 }
